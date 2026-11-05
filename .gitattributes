@@ -1,0 +1,10 @@
+# Line endings are decided here, by the repository, not by each contributor's local git
+# config. Without this file the result depends on every machine's core.autocrlf setting, which
+# produces diffs that show every line as changed when only one line really was.
+* text=auto eol=lf
+
+# Binary assets must never be line-ending converted: that would corrupt them.
+*.png binary
+
+# Keep generated reports and evidence out of diffs if they are ever committed deliberately.
+*.pdf binary
