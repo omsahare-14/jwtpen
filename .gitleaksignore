@@ -1,14 +1,18 @@
 # Fingerprints of gitleaks findings reviewed and confirmed to be false positives.
 #
 # Format: <commit>:<file>:<rule>:<line>. Fingerprints pin one specific occurrence rather than
-# disabling a rule, so a genuine key committed elsewhere, or later in this same file, is still
+# disabling a rule, so a genuine key committed elsewhere, or later in the same file, is still
 # caught. Each entry needs a reason.
 #
-# Note these reference historical commits on purpose: the CI job scans history, not just the
-# working tree, so a finding stays reported even after the line is changed. That is the correct
-# behaviour for secret scanning, since anything once committed remains retrievable.
+# These reference commits on purpose: the CI job scans history, not just the working tree, so a
+# finding stays reported even after the line changes. That is correct for secret scanning, since
+# anything once committed remains retrievable.
+#
+# MAINTENANCE NOTE: because the commit hash is part of the fingerprint, rewriting history
+# invalidates every entry here and the findings come back. If history is ever rewritten again,
+# re-run `gitleaks git -v .` and replace the hashes below with the new ones.
 
 # tests/test_keys.py:48 asserts that a generated private key serialises to PKCS#8 PEM, by
 # checking the output starts with the standard header. The matched text is the header string
-# itself; no key material is present. The key in that test is generated at runtime.
-3f490a68a2e76133302da9f92b49168894089e0c:tests/test_keys.py:private-key:48
+# itself; no key material is present, and the key in that test is generated at runtime.
+9859e3ddde0e3b1ccf6bae8df7c105977cf9cc45:tests/test_keys.py:private-key:48
