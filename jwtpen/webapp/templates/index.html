@@ -1,0 +1,156 @@
+<!-- The web UI page, served by server.py. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>jwtpen: JWT Test Console</title>
+  <meta name="description" content="A local tool for testing JSON Web Tokens: paste a captured request, pick the session token, run the checks, and read the findings.">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar__inner">
+      <div class="brand">
+        <span class="brand__mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="8" cy="12" r="4"></circle>
+            <path d="M12 12h9M18 12v3M15 12v2"></path>
+          </svg>
+        </span>
+        <p class="wordmark">jwtpen</p>
+      </div>
+
+      <ol class="stepper" id="stepper" aria-label="Steps">
+        <li class="stepper__item is-active" data-step="1"><span class="stepper__dot">1</span><span class="stepper__label">Request</span></li>
+        <li class="stepper__item" data-step="2"><span class="stepper__dot">2</span><span class="stepper__label">Token</span></li>
+        <li class="stepper__item" data-step="3"><span class="stepper__dot">3</span><span class="stepper__label">Checks</span></li>
+        <li class="stepper__item" data-step="4"><span class="stepper__dot">4</span><span class="stepper__label">Report</span></li>
+      </ol>
+
+      <p class="topbar__note">For authorized testing only. Requests are sent from this machine.</p>
+    </div>
+  </header>
+
+  <main>
+    <!-- Step 1: paste the request -------------------------------------- -->
+    <section class="panel is-in" id="panel-request">
+      <div class="panel__head">
+        <span class="panel__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="4" width="8" height="4" rx="1"/><path d="M8 6H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-2"/><path d="M8.5 13h7M8.5 16.5h5"/></svg>
+        </span>
+        <div>
+          <h2 class="panel__title">Paste The Request</h2>
+          <p class="panel__hint">Copy a raw HTTP request from Burp Suite (right-click, then &ldquo;Copy&rdquo;) and paste it below.</p>
+        </div>
+      </div>
+
+      <label for="raw-request">Raw HTTP request</label>
+      <textarea id="raw-request" spellcheck="false" placeholder="GET /my-account HTTP/2&#10;Host: lab.example.net&#10;Cookie: session=eyJ..."></textarea>
+
+      <div class="row row--between">
+        <div>
+          <label for="scheme-https">Scheme</label>
+          <div class="segmented" role="radiogroup" aria-label="Scheme">
+            <input type="radio" name="scheme" id="scheme-https" value="https" checked>
+            <label for="scheme-https">https</label>
+            <input type="radio" name="scheme" id="scheme-http" value="http">
+            <label for="scheme-http">http</label>
+          </div>
+        </div>
+        <button class="btn btn--primary" id="btn-detect" type="button">
+          <span>Detect Tokens</span>
+          <svg class="btn__icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10h11M11 6l4 4-4 4"/></svg>
+        </button>
+      </div>
+    </section>
+
+    <!-- Step 2: choose the session token ------------------------------- -->
+    <section class="panel" id="panel-token" hidden>
+      <div class="panel__head">
+        <span class="panel__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="7.5" cy="12" r="3.5"/><path d="M11 12h9M17 12v3.5M20 12v2.5"/></svg>
+        </span>
+        <div>
+          <h2 class="panel__title">Choose The Session Token</h2>
+          <p class="panel__hint">Pick the JWT that authenticates the request. Each candidate is decoded so you can tell them apart.</p>
+        </div>
+      </div>
+
+      <div id="token-region" aria-live="polite"></div>
+
+      <!-- Fallback: only needed when detection misses the token. -->
+      <div class="fallback" id="manual-fallback" hidden>
+        <p class="fallback__lead">Not seeing the token you need? Paste it in manually.</p>
+        <label for="manual-token">Session JWT</label>
+        <input type="text" id="manual-token" spellcheck="false" placeholder="eyJhbGciOi...">
+        <div class="row">
+          <button class="btn btn--ghost" id="btn-manual" type="button">Use This Token</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Step 3: select checks ------------------------------------------ -->
+    <section class="panel" id="panel-checks" hidden>
+      <div class="panel__head">
+        <span class="panel__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7l2 2 3-3M4 16l2 2 3-3"/><path d="M13 7h7M13 17h7"/></svg>
+        </span>
+        <div>
+          <h2 class="panel__title">Select Checks</h2>
+          <p class="panel__hint">Each check forges a token and resends your request to see how the server responds.</p>
+        </div>
+      </div>
+
+      <label class="check-all" for="check-all">
+        <input type="checkbox" id="check-all" checked>
+        <span>Select all checks</span>
+      </label>
+      <div class="checks" id="checks-region" aria-live="polite"></div>
+      <div class="run-block" id="run-block" role="alert" hidden></div>
+      <div class="actions-end">
+        <button class="btn btn--primary" id="btn-run" type="button" disabled>
+          <span>Run Checks</span>
+          <svg class="btn__icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l10 6-10 6z"/></svg>
+        </button>
+      </div>
+    </section>
+
+    <!-- Step 4: run + open report -------------------------------------- -->
+    <section class="panel" id="panel-report" hidden>
+      <div class="panel__head">
+        <span class="panel__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 2.5v5.5c0 4.4-3 7.3-7 8.5-4-1.2-7-4.1-7-8.5V5.5L12 3z"/><path d="M9 11.5l2 2 4-4.5"/></svg>
+        </span>
+        <div>
+          <h2 class="panel__title">Report</h2>
+          <p class="panel__hint">The detailed HTML report opens automatically when the checks finish.</p>
+        </div>
+      </div>
+
+      <div class="report-status" id="report-status" aria-live="polite">
+        <div class="spinner" id="report-spinner" aria-hidden="true"></div>
+        <div>
+          <p class="report-status__title" id="report-status-title">Running checks&hellip;</p>
+          <p class="report-status__hint" id="report-status-hint">Forging tokens and sending your request. The report will open in a new tab.</p>
+        </div>
+      </div>
+
+      <div class="report-actions" id="report-actions" hidden>
+        <button class="btn btn--primary" id="btn-open-report" type="button">
+          <span>Open Report</span>
+          <svg class="btn__icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10h11M11 6l4 4-4 4"/></svg>
+        </button>
+        <span class="hint">If it didn&rsquo;t open in a new tab, click here.</span>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>For authorized security testing only. Use jwtpen solely against systems you own or are explicitly authorized in writing to test.</p>
+    <p class="site-footer__copy">&copy; <span id="year"></span> jwtpen</p>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

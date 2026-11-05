@@ -1,0 +1,22 @@
+# jwtpen dependencies.
+# ">=X" means "version X or newer", pip installs the LATEST that meets the floor.
+# The floors are a safety minimum (older versions lack features/security fixes we need).
+# Once the tool is stable, freeze exact versions with:  pip freeze > requirements.lock.txt
+
+# --- Core engine ---
+requests>=2.31          # core/checker.py: send the rebuilt request to the target
+cryptography>=42.0      # core/keys.py: RSA keygen, PEM <-> JWK, public-key-as-HMAC bytes
+
+# --- Report (HTML + PDF) ---
+Jinja2>=3.1             # report/html.py: render the HTML report
+MarkupSafe>=2.1         # report/html.py: safe inline-<code> escaping (ships with Jinja2)
+playwright>=1.44        # report/pdf.py: headless-Chromium HTML -> PDF
+                        #   one-time after install:  playwright install chromium
+
+# --- Local web app (primary interface) ---
+fastapi>=0.110          # webapp/server.py: API, routing, request validation
+uvicorn>=0.29           # ASGI server that runs the app
+pydantic>=2.9           # webapp/server.py: typed request models (ships with FastAPI)
+
+# --- Tests (offline, no network) ---
+pytest>=8.0             # run the suite in tests/
