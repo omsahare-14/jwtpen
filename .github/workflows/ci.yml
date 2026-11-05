@@ -1,0 +1,112 @@
+# Continuous integration: run the test suite and the security checks on a clean machine.
+#
+# Why this exists: tests that only ever run on the author's laptop eventually depend on
+# something installed there. A fresh runner proves the project works from a clean checkout.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:        # lets you trigger a run by hand from the Actions tab
+
+# Least privilege: these jobs only read the repository. A workflow that cannot write cannot be
+# turned into a way to push code if one of its dependencies is ever compromised.
+permissions:
+  contents: read
+
+concurrency:
+  # A newer push makes an in-flight run for the same branch pointless, so cancel it.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Tests (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false      # one failing version must not hide the others
+      matrix:
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run the test suite
+        # The suite is offline by construction: an autouse guard fails any test that attempts a
+        # real outbound request, and API tests drive the ASGI app in-process. So no secrets,
+        # no network target, and nothing to clean up.
+        run: pytest -q
+
+  pdf-export:
+    name: PDF export (headless Chromium)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Install the Chromium build Playwright drives
+        # Without this the PDF export test skips itself. This job exists so that path is
+        # genuinely exercised rather than quietly untested.
+        run: playwright install --with-deps chromium
+
+      - name: Run the suite including the PDF render
+        run: pytest -q
+
+  security:
+    name: Security checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0    # gitleaks scans history, not just the current files
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install dependencies and scanners
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pip-audit bandit
+
+      - name: Known vulnerabilities in dependencies (pip-audit)
+        # The supply chain is the most likely way a tool like this gets compromised: the code
+        # can be perfect and still ship a vulnerable library.
+        run: pip-audit --strict
+
+      - name: Static analysis of our own code (bandit)
+        # -ll reports medium severity and above, which keeps the signal usable.
+        run: bandit -r jwtpen -ll
+
+      - name: Secrets committed to history (gitleaks)
+        # GitHub's own secret scanning is free on public repos but not private ones, so this
+        # covers the gap while the repository is private. A pentesting tool handles real
+        # tokens; a committed one would be unrecoverable once pushed.
+        env:
+          GITLEAKS_VERSION: "8.21.2"
+        run: |
+          curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            | tar -xz -C /tmp gitleaks
+          /tmp/gitleaks detect --source . --redact --verbose
