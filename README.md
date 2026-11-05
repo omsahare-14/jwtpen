@@ -56,6 +56,41 @@ pip install -r requirements.txt
 playwright install chromium     # one-time, for PDF export
 ```
 
+<details>
+<summary>🔒 <strong>Reproducible install (recommended for engagement work)</strong></summary>
+
+`requirements.txt` states the minimum versions jwtpen needs and lets pip pick the newest that
+fit, so two people installing a week apart can end up with different builds.
+`requirements.lock.txt` pins every package to an exact version with a SHA-256 hash:
+
+```bash
+pip install --require-hashes -r requirements.lock.txt
+```
+
+`--require-hashes` makes pip refuse any package whose contents do not match the recorded hash,
+so a tampered or substituted release fails to install instead of running. Use this when the
+tool is going anywhere near a real engagement.
+
+The lock file is generated on Python 3.14. On older supported versions install from
+`requirements.txt` instead. Regenerate it after changing a dependency with:
+
+```bash
+pip-compile --generate-hashes --output-file=requirements.lock.txt requirements.txt
+```
+
+</details>
+
+## ✅ Running the tests
+
+```bash
+pytest                  # all 173 tests
+pytest -m "not slow"    # skip the PDF render
+```
+
+The suite never touches the network and never binds a port: a guard fails any test that
+attempts a real request, so running it can't reach a live host by accident. See
+[tests/TEST-PLAN.md](tests/TEST-PLAN.md).
+
 ## ▶️ Running
 
 ```bash

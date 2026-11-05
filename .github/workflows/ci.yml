@@ -72,6 +72,27 @@ jobs:
       - name: Run the suite including the PDF render
         run: pytest -q
 
+  locked-install:
+    name: Reproducible install (hash-pinned)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"     # the version requirements.lock.txt was generated with
+          cache: pip
+
+      - name: Install from the hash-pinned lock file
+        # --require-hashes makes pip refuse any package whose contents do not match the
+        # recorded hash, so this also proves the lock file is still internally consistent.
+        run: |
+          python -m pip install --upgrade pip
+          pip install --require-hashes -r requirements.lock.txt
+
+      - name: Run the test suite against the locked versions
+        run: pytest -q -m "not slow"
+
   security:
     name: Security checks
     runs-on: ubuntu-latest

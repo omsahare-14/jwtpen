@@ -187,6 +187,7 @@ def test_prepare_404s_for_an_unknown_check(api):
     assert api.post("/prepare/no_such_check").status_code == 404
 
 
+@pytest.mark.slow
 @pytest.mark.skipif(shutil.which("node") is None and not shutil.which("chrome"),
                     reason="headless Chromium not verifiable in this environment")
 def test_report_pdf_renders_after_a_scan(api, fake_target):

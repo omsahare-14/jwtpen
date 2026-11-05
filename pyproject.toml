@@ -1,0 +1,22 @@
+# Tool configuration only.
+#
+# This file deliberately has no [project] or [build-system] section: jwtpen is installed by
+# cloning the repository, not with pip, so there is no packaging metadata to maintain. The
+# purpose here is to keep tool settings in one place instead of scattering .ini and .cfg files
+# across the root. Adding packaging later is a small, additive change.
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+# Fail on an unregistered marker rather than silently ignoring a typo in a @pytest.mark name,
+# which would quietly stop a test from being selected.
+addopts = "--strict-markers"
+
+markers = [
+    "slow: needs the headless Chromium build and takes seconds rather than milliseconds. Skip with -m 'not slow'.",
+]
+
+[tool.bandit]
+# Tests legitimately contain asserts and crafted tokens; scanning them produces noise rather
+# than signal. The application code in jwtpen/ is what gets analysed.
+exclude_dirs = ["tests", ".venv"]

@@ -1,0 +1,32 @@
+# Dependabot opens pull requests when a dependency has a newer version or a known
+# vulnerability.
+#
+# Why this matters more than usual here: jwtpen's own code can be flawless and the tool can
+# still ship a vulnerable library. CI runs the full suite against each of these PRs, so a
+# routine bump is normally a one-click merge, and a bump that breaks something shows up as a
+# red check instead of a surprise for whoever clones the repo next.
+version: 2
+
+updates:
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps"
+    groups:
+      # One PR for routine version bumps keeps the noise down. Anything with a security
+      # advisory is raised separately and immediately, regardless of this grouping.
+      python-packages:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+
+  # The workflow's own actions are code that runs with access to the repository, so they are
+  # pinned and updated like any other dependency.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "ci"
