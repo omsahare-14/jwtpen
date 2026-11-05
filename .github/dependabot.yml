@@ -10,9 +10,13 @@ version: 2
 updates:
   - package-ecosystem: pip
     directory: "/"
+    # Monthly, not weekly. This is a finished tool rather than one under active development,
+    # so weekly pull requests would be noise, and noise that gets ignored trains you to ignore
+    # the alerts that matter. Anything with a security advisory is still raised immediately,
+    # independently of this schedule.
     schedule:
-      interval: weekly
-    open-pull-requests-limit: 5
+      interval: monthly
+    open-pull-requests-limit: 3
     commit-message:
       prefix: "deps"
     groups:
