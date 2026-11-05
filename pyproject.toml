@@ -8,6 +8,14 @@
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
+# Put the repository root on sys.path so `import jwtpen` works.
+#
+# jwtpen is run from a clone rather than installed, so nothing else puts it on the path.
+# `python -m pytest` happens to add the current directory and so papers over this, but the
+# bare `pytest` command does not, which is exactly how CI invokes it. Setting it here means
+# both invocations behave identically on every machine.
+pythonpath = ["."]
+
 # Fail on an unregistered marker rather than silently ignoring a typo in a @pytest.mark name,
 # which would quietly stop a test from being selected.
 addopts = "--strict-markers"
