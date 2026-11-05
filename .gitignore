@@ -1,23 +1,49 @@
-# Python bytecode / caches
+# Python bytecode and caches
 __pycache__/
 *.pyc
+*.pyo
 
-# Virtual environment (see README setup)
+# Virtual environments. Several names are listed because contributors pick
+# different ones and an accidentally committed venv is tens of thousands of files.
 .venv/
+venv/
+env/
 
-# Pytest cache (tests/)
+# Test and type-checker caches
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
 
-# Generated scan reports: the HTML/PDF the tool writes
+# Engagement data.
+#
+# This is the section that matters most here. jwtpen handles live credentials:
+# captured requests, session tokens, secrets it cracks, and private keys it
+# generates. None of that belongs in version control, and anything committed
+# once stays retrievable from history even after it is deleted. These patterns
+# are deliberately broad.
 reports/
-
-# Secrets: this tool handles real tokens/requests; never commit them
+*.pem
+*.key
+*.p12
+*.pfx
+*.jwt
+*.har
+*.pdf
 .env
+.env.*
 
-# Claude Code local session files
-.claude/
-CLAUDE.md
+# Build artefacts, if packaging is ever added
+build/
+dist/
+*.egg-info/
 
-# Editor + Windows OS files
+# Editor and operating system files
 .vscode/
+.idea/
+*.swp
+*~
 Thumbs.db
+desktop.ini
+.DS_Store
