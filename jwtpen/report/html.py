@@ -41,7 +41,11 @@ def _inline_code(text):
     # split() on the backtick alternates plain / code / plain / code ...; odd pieces are code.
     pieces = [f"<code>{escape(part)}</code>" if i % 2 else str(escape(part))
               for i, part in enumerate(text.split("`"))]
-    return Markup("".join(pieces))
+    # Every piece above is escape()d before it is joined, so the only markup this can emit is
+    # the <code> wrapper we add ourselves. Marking it Markup() tells Jinja not to escape it a
+    # second time, which would show the tags as literal text instead of rendering them.
+    # Covered by the escaping tests in tests/test_security.py (SEC-03, SEC-04, SEC-05).
+    return Markup("".join(pieces))  # nosec B704
 
 
 _env.filters["inline_code"] = _inline_code
