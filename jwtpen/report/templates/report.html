@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JWT Security Assessment: {{ target }}</title>
+<style>
+/* Self-contained report styles: all tokens inline, no external calls, print-stable. */
+
+:root {
+  --paper: #f3f1ea;
+  --surface: #ffffff;
+  --ink: #181b21;
+  --ink-soft: #4b515c;
+  --ink-faint: #878d98;
+  --line: #e6e1d6;
+  --line-strong: #d6d0c3;
+
+  /* header fades from an elevated slate down to the page's own top colour, so the masthead and
+     the page background read as one continuous surface (and it's a clean dark banner in print). */
+  --header-bg: #1c3656;
+  --header-bg-2: #0e1824;
+  --header-ink: #f2f5f9;
+  --header-soft: #9fb4ca;
+
+  --accent: #0f766e;
+  --accent-bright: #15a097;
+  --accent-bg: #e6f3f1;
+
+  --vulnerable: #c0362c;      --vulnerable-bg: #fcebe9;   --vulnerable-tint: #fdf4f3;
+  --not-vulnerable: #0b7a4b;  --not-vulnerable-bg: #e6f5ed; --not-vulnerable-tint: #f2faf6;
+  --inconclusive: #b26a08;    --inconclusive-bg: #fcf1df; --inconclusive-tint: #fdf8ef;
+  --skipped: #5f6570;         --skipped-bg: #edeff2;      --skipped-tint: #f6f7f8;
+
+  --high: #c0362c;    --high-bg: #fcebe9;
+  --medium: #b26a08;  --medium-bg: #fcf1df;
+  --low: #1f6fd6;     --low-bg: #e9f1fc;
+
+  /* System fonts only (no downloads), so the report renders the same everywhere and the PDF
+     stays self-contained. Segoe UI Variable (Win11) / system-ui give a clean modern face;
+     display reuses the same family for a cohesive look rather than a mismatched serif. */
+  --font-sans: "Segoe UI Variable Text", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  /* display reuses the exact same family as the body so every heading and the body match
+     (we only vary weight/size, never the typeface). */
+  --font-serif: var(--font-sans);
+  --font-mono: ui-monospace, "Cascadia Code", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+
+  --measure: 62rem;
+  --gutter: 1.25rem;
+  --radius: 14px;
+}
+
+* { box-sizing: border-box; }
+
+html, body { overflow-x: clip; margin: 0; }
+
+body {
+  background:
+    radial-gradient(1200px 720px at 50% -12%, #18304a, transparent 60%),
+    linear-gradient(180deg, #0e1824, #0b111b 60%, #0c1016);
+  background-attachment: fixed;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 10pt;   /* normal text, incl. list items / points */
+  line-height: 1.62;
+  -webkit-font-smoothing: antialiased;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+/* On screen, the findings float over a colourful living background, matching the app. The
+   cards stay light so the content is fully readable; the PDF drops all this for clean paper. */
+body::before,
+body::after { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none; }
+body::before {
+  inset: -20%;
+  background:
+    radial-gradient(780px 680px at 0% 8%, rgba(16,224,198,0.55), transparent 58%),
+    radial-gradient(740px 700px at 100% 6%, rgba(150,112,255,0.52), transparent 58%),
+    radial-gradient(860px 760px at 98% 94%, rgba(54,142,255,0.50), transparent 58%),
+    radial-gradient(760px 700px at 0% 98%, rgba(255,98,152,0.44), transparent 58%);
+  filter: blur(6px);
+  animation: aurora 20s ease-in-out infinite alternate;
+}
+body::after {
+  background-image: radial-gradient(circle, rgba(255,255,255,0.06) 1.2px, transparent 1.8px);
+  background-size: 22px 22px;
+}
+@keyframes aurora {
+  0%   { transform: translate3d(-3%, 2%, 0) scale(1);    }
+  50%  { transform: translate3d(2%, -2%, 0) scale(1.06); }
+  100% { transform: translate3d(4%, -5%, 0) scale(1.1);  }
+}
+@media (prefers-reduced-motion: reduce) { body::before { animation: none; } }
+
+:focus-visible {
+  outline: 2px solid var(--accent-bright);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+svg { display: block; }
+
+/* ---- Masthead ---- */
+.masthead {
+  background: linear-gradient(180deg, var(--header-bg), var(--header-bg-2));
+  color: var(--header-ink);
+  position: relative;
+  overflow: hidden;
+}
+.masthead::after {
+  content: "";
+  position: absolute;
+  inset: 0 -20% auto auto;
+  width: 22rem; height: 22rem;
+  background: radial-gradient(circle, rgba(21, 160, 151, 0.18), transparent 62%);
+  pointer-events: none;
+}
+.masthead__inner {
+  position: relative;
+  max-width: var(--measure);
+  margin-inline: auto;
+  padding: clamp(1.25rem, 3vw, 1.85rem) var(--gutter) clamp(1.1rem, 2.5vw, 1.5rem);
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.85rem;
+}
+.brand__mark {
+  width: 1.5rem; height: 1.5rem;
+  color: var(--accent-bright);
+}
+.wordmark {
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  letter-spacing: 0.01em;
+  margin: 0;
+}
+.masthead h1 {
+  font-family: var(--font-serif);
+  font-size: clamp(1.55rem, 4vw, 2.1rem);
+  line-height: 1.08;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  margin: 0 0 0.35rem;
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+.masthead__sub {
+  color: var(--header-soft);
+  font-size: 0.95rem;
+  margin: 0 0 1.1rem;
+  max-width: 42rem;
+}
+.meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 11rem));
+  gap: 0.5rem 2rem;
+  margin: 0;
+  padding-top: 0.9rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+}
+.meta div { min-width: 0; }
+.meta dt { font-size: 0.74rem; color: var(--header-soft); margin-bottom: 0.1rem; }
+.meta dd { margin: 0; font-size: 0.95rem; overflow-wrap: break-word; min-width: 0; }
+
+/* ---- Page body ---- */
+.page {
+  max-width: var(--measure);
+  margin-inline: auto;
+  padding: clamp(1.75rem, 4vw, 2.75rem) var(--gutter) 4rem;
+}
+/* findings follow the verdict panel directly (no "Findings" heading); keep them spaced from it */
+.findings { margin-top: 2rem; }
+
+/* ---- Verdict panel ---- */
+.verdict {
+  --tone: var(--skipped); --tone-bg: var(--skipped-tint);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 1.1rem 1.4rem;
+  align-items: center;
+  background:
+    linear-gradient(0deg, var(--tone-bg), var(--tone-bg)),
+    var(--surface);
+  border: 1px solid var(--line);
+  border-left: 5px solid var(--tone);
+  border-radius: var(--radius);
+  padding: 1.6rem 1.75rem;
+  box-shadow: 0 2px 10px rgba(24, 27, 33, 0.05);
+}
+.verdict--vulnerable { --tone: var(--vulnerable); --tone-bg: var(--vulnerable-tint); }
+.verdict--not-vulnerable { --tone: var(--not-vulnerable); --tone-bg: var(--not-vulnerable-tint); }
+.verdict--inconclusive { --tone: var(--inconclusive); --tone-bg: var(--inconclusive-tint); }
+.verdict__icon {
+  width: 3rem; height: 3rem;
+  color: var(--tone);
+}
+.verdict__headline {
+  font-family: var(--font-serif);
+  font-size: clamp(1.4rem, 3.5vw, 1.9rem);
+  font-weight: 600;
+  line-height: 1.15;
+  margin: 0 0 0.3rem;
+  color: var(--tone);
+}
+.verdict__detail { margin: 0; color: var(--ink-soft); }
+.verdict__bar {
+  grid-column: 1 / -1;
+  display: flex;
+  height: 0.6rem;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--line);
+}
+.verdict__seg { min-width: 0.35rem; }
+.seg--vulnerable { background: var(--vulnerable); }
+.seg--not-vulnerable { background: var(--not-vulnerable); }
+.seg--inconclusive { background: var(--inconclusive); }
+.seg--skipped { background: var(--skipped); }
+.legend {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.4rem;
+  margin: 0;
+  font-size: 0.86rem;
+  color: var(--ink-soft);
+}
+.legend span { display: inline-flex; align-items: center; gap: 0.45rem; }
+.legend i {
+  width: 0.7rem; height: 0.7rem; border-radius: 3px; flex: none;
+}
+.legend .k-vulnerable { background: var(--vulnerable); }
+.legend .k-not-vulnerable { background: var(--not-vulnerable); }
+.legend .k-inconclusive { background: var(--inconclusive); }
+.legend .k-skipped { background: var(--skipped); }
+.legend b { font-weight: 650; color: var(--ink); font-variant-numeric: tabular-nums; }
+
+/* ---- Finding card ---- */
+.finding {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  margin-bottom: 1.2rem;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(24, 27, 33, 0.06);
+}
+.finding--vulnerable { --status: var(--vulnerable); --status-bg: var(--vulnerable-bg); --status-tint: var(--vulnerable-tint); }
+.finding--not-vulnerable { --status: var(--not-vulnerable); --status-bg: var(--not-vulnerable-bg); --status-tint: var(--not-vulnerable-tint); }
+.finding--inconclusive { --status: var(--inconclusive); --status-bg: var(--inconclusive-bg); --status-tint: var(--inconclusive-tint); }
+.finding--skipped { --status: var(--skipped); --status-bg: var(--skipped-bg); --status-tint: var(--skipped-tint); }
+
+.finding__head {
+  list-style: none;
+  cursor: pointer;
+  padding: 1.1rem 1.4rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem 0.95rem;
+  background: var(--status-tint);
+  border-left: 4px solid var(--status);
+}
+.finding__head::-webkit-details-marker { display: none; }
+.finding__index {
+  font-family: var(--font-serif);
+  font-size: 15pt;
+  font-weight: 600;
+  color: var(--status);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.finding__title {
+  font-size: 13pt;   /* finding title, e.g. "Weak HMAC Secret" */
+  font-weight: 640;
+  letter-spacing: -0.005em;
+  margin: 0;
+  flex: 1 1 13rem;
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+.marker {
+  font-family: var(--font-mono);
+  color: var(--ink-faint);
+  font-size: 1.15rem;
+  width: 1rem; text-align: center;
+}
+.finding[open] .marker-closed { display: none; }
+.finding:not([open]) .marker-open { display: none; }
+
+.pill {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 650;
+  padding: 0.25rem 0.72rem;
+  border-radius: 999px;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+}
+.pill--status { background: var(--status); color: #fff; }
+.pill--sev { background: var(--surface); color: var(--sev); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--sev) 32%, transparent); }
+.sev--high { --sev: var(--high); }
+.sev--medium { --sev: var(--medium); }
+.sev--low { --sev: var(--low); }
+
+.finding__body { padding: 0.4rem 1.5rem 1.7rem; border-left: 4px solid var(--status); }
+.finding__summary { margin: 1.1rem 0 0; font-size: 10pt; font-weight: 500; line-height: 1.5; }
+
+/* ---- Blocks inside a finding ---- */
+.block { margin-top: 1.65rem; }
+.block > h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 12pt;   /* subheading (e.g. "What The Tool Did") */
+  font-weight: 650;
+  color: var(--accent);
+  margin: 0 0 0.65rem;
+}
+.block > h3 svg { width: 1.05rem; height: 1.05rem; flex: none; }
+.block p { margin: 0; }
+.steps, .notes { margin: 0; padding-left: 1.4rem; }
+.steps li, .notes li { margin-bottom: 0.4rem; }
+.steps li::marker { color: var(--accent); font-weight: 650; }
+
+/* inline code (shell commands in steps/summary/remediation) */
+code {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  background: var(--accent-bg);
+  color: var(--accent);
+  padding: 0.1em 0.38em;
+  border-radius: 4px;
+  overflow-wrap: anywhere;
+}
+
+.evidence {
+  margin: 0;
+  background: var(--accent-bg);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 8px 8px 0;
+  padding: 0.65rem 1rem;
+}
+.evidence > div {
+  display: grid;
+  grid-template-columns: minmax(0, 11rem) minmax(0, 1fr);
+  gap: 0.2rem 1rem;
+  padding: 0.35rem 0;
+}
+.evidence > div + div { border-top: 1px solid color-mix(in srgb, var(--accent) 16%, transparent); }
+.evidence dt { color: var(--accent); font-size: 0.88rem; font-weight: 600; min-width: 0; }
+.evidence dd {
+  margin: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.evidence__value {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--ink);
+  /* pre-wrap keeps real newlines (e.g. a PEM's line breaks) intact; break-word still wraps a
+     long unbroken string like a token so neither overflows the column. */
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+/* One-click copy for each evidence value (screen only; hidden in the PDF). The value is the
+   artifact a tester reproduces with (forged token, key PEM, source URL), so every one carries a
+   button that copies its exact text, newlines and all, instead of the reader hand-selecting it. */
+.copy-btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.7rem; height: 1.7rem;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--accent);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.copy-btn:hover { background: var(--accent); color: var(--surface); }
+.copy-btn svg { width: 0.95rem; height: 0.95rem; }
+.copy-btn.copied { color: var(--not-vulnerable); border-color: var(--not-vulnerable); background: var(--surface); }
+
+/* ---- Report toolbar (screen only) ---- */
+.report-toolbar { display: flex; justify-content: flex-end; margin-bottom: 1.25rem; }
+.pdf-btn {
+  font: inherit; font-size: 0.9rem; font-weight: 600;
+  display: inline-flex; align-items: center; gap: 0.45rem;
+  padding: 0.5rem 1rem; border-radius: 9px;
+  border: 1px solid transparent;
+  background: var(--accent); color: var(--surface); cursor: pointer;
+  box-shadow: 0 8px 18px -12px rgba(15, 118, 110, 0.7);
+}
+.pdf-btn svg { width: 1.05rem; height: 1.05rem; }
+.pdf-btn:hover:not(:disabled) { background: var(--accent-bright); }
+.pdf-btn:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
+
+/* ---- References ---- */
+.references { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.5rem; }
+.references li { margin: 0; }
+.references a {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 550;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  padding-bottom: 1px;
+}
+.references a:hover { border-bottom-color: var(--accent); }
+
+/* ---- Footer ---- */
+.footer {
+  margin-top: 3.25rem;
+  padding-top: 1.35rem;
+  border-top: 1px solid rgba(255,255,255,0.14);   /* footer sits on the dark page background */
+  color: rgba(226,232,240,0.6);
+  font-size: 0.85rem;
+}
+
+@media (max-width: 36rem) {
+  .verdict { grid-template-columns: 1fr; }
+  .verdict__icon { width: 2.4rem; height: 2.4rem; }
+  .evidence > div { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ---- Print / PDF ----
+   The screen design is sized in rem (a 16px root) for a roomy web layout. On paper that reads
+   as chunky, so for print we rebuild the scale around an 11pt body: explicit, smaller type;
+   tight spacing; flat card chrome (no shadows, hairline rules). Everything here is print-only
+   and leaves the on-screen report untouched. Goal: a dense, designed page where one finding
+   fits on one sheet. */
+@media print {
+  :root { --paper: #ffffff; --line: #d9d4c8; }
+  /* clean, printable paper (no dark full-bleed background), with just a faint corner tint */
+  body {
+    font-size: 10pt; line-height: 1.4;
+    background: radial-gradient(900px 620px at 100% -4%, #eaf3ff, transparent 55%), #ffffff;
+  }
+  body::before, body::after { display: none; }
+  .page { padding: 10pt 0 0; }
+  a { color: inherit; text-decoration: none; }
+
+  /* chrome off: no shadows, tighter corners */
+  .verdict, .finding { box-shadow: none; border-radius: 6px; }
+  .marker, .report-toolbar, .copy-btn { display: none; }
+
+  /* masthead, a compact title band, not a hero */
+  .masthead__inner { padding: 14pt 16pt 12pt; }
+  .brand { margin-bottom: 6pt; }
+  .brand__mark { width: 13pt; height: 13pt; }
+  .wordmark { font-size: 9pt; }
+  .masthead h1 { font-size: 20pt; margin-bottom: 3pt; }
+  .masthead__sub { font-size: 10pt; margin-bottom: 10pt; }
+  .meta { gap: 4pt 20pt; padding-top: 8pt; }
+  .meta dt { font-size: 7pt; }
+  .meta dd { font-size: 9.5pt; }
+
+  /* verdict panel */
+  .findings { margin-top: 14pt; }
+  .verdict { padding: 11pt 13pt; gap: 8pt 12pt; }
+  .verdict__icon { width: 26pt; height: 26pt; }
+  .verdict__headline { font-size: 16pt; margin-bottom: 2pt; }
+  .verdict__detail { font-size: 10pt; }
+  .verdict__bar { height: 5pt; }
+  .legend { font-size: 8.5pt; gap: 3pt 14pt; }
+
+  /* finding card */
+  .finding { margin-bottom: 9pt; }
+  .finding__head { padding: 7pt 11pt; gap: 4pt 9pt; cursor: default; break-after: avoid; }
+  .finding__index { font-size: 15pt; }
+  .finding__title { font-size: 13pt; }
+  .pill { font-size: 8pt; padding: 2pt 7pt; }
+  .finding__body { padding: 2pt 13pt 11pt; }
+  .finding__summary { font-size: 10pt; line-height: 1.45; margin-top: 8pt; }
+
+  /* blocks inside a finding, subheadings (13pt) sit above the 10pt body text, below the title */
+  .block { margin-top: 10pt; }
+  .block > h3 { font-size: 12pt; margin-bottom: 5pt; }
+  .block > h3 svg { width: 12pt; height: 12pt; }
+  .steps, .notes { padding-left: 15pt; }
+  .steps li, .notes li { margin-bottom: 2pt; }
+  .evidence { padding: 6pt 9pt; }
+  .evidence > div { padding: 2.5pt 0; }
+  .evidence dt { font-size: 9pt; }
+  .evidence__value { font-size: 9pt; }
+  .references { gap: 3pt; }
+  .references a { color: var(--accent); border-bottom: none; }
+  .footer { margin-top: 16pt; padding-top: 9pt; font-size: 8.5pt; border-top-color: var(--line); color: var(--ink-faint); }
+
+  /* A finding may span a page boundary (so it flows on right after the verdict instead of
+     being bumped whole to the next sheet and leaving half a page blank), but its inner
+     pieces stay intact: never split the summary, a step list, or the evidence table, and
+     never strand a finding's head at the foot of a page. */
+  .verdict, .block, .steps, .notes, .evidence, .references { break-inside: avoid; }
+
+  /* every finding fully visible even if collapsed on screen */
+  details.finding:not([open]) > .finding__body { display: block !important; }
+  @page { margin: 14mm 13mm; }
+}
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="masthead__inner">
+    <div class="brand">
+      <svg class="brand__mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="8" cy="12" r="3.2"/>
+        <path d="M11 12h10"/><path d="M17 12v3.2"/><path d="M20.5 12v2.4"/>
+      </svg>
+      <p class="wordmark">jwtpen</p>
+    </div>
+    <h1>JWT Security Assessment</h1>
+    <p class="masthead__sub">Automated testing of JSON Web Tokens for common authentication and signature vulnerabilities.</p>
+    <dl class="meta">
+      <div><dt>Target</dt><dd>{{ target }}</dd></div>
+      <div><dt>Generated</dt><dd>{{ scan_time.strftime("%d %B %Y, %H:%M") }}</dd></div>
+      <div><dt>Checks Run</dt><dd>{{ summary.total }}</dd></div>
+    </dl>
+  </div>
+</header>
+
+<main class="page">
+
+  <div class="report-toolbar">
+    <button type="button" class="pdf-btn" id="export-pdf"
+            title="Download this report as a PDF.">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3v9M6.5 8.5 10 12l3.5-3.5"/><path d="M4 15.5h12"/></svg>
+      Export PDF
+    </button>
+  </div>
+
+  <section class="verdict verdict--{{ verdict.level }}">
+    {% if verdict.level == "not-vulnerable" %}
+    <svg class="verdict__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M12 2l8 3v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V5l8-3z"/><path d="M8.5 12l2.5 2.5L15.5 9"/>
+    </svg>
+    {% else %}
+    <svg class="verdict__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M12 3l9 16H3z"/><path d="M12 9v4.5"/><path d="M12 16.5h.01"/>
+    </svg>
+    {% endif %}
+    <div>
+      <h2 class="verdict__headline">{{ verdict.headline }}</h2>
+      <p class="verdict__detail">{{ verdict.detail }}</p>
+    </div>
+    <div class="verdict__bar">
+      {% for label, count, key in summary.rows %}{% if count %}
+      <div class="verdict__seg seg--{{ key }}" style="flex: {{ count }}"></div>
+      {% endif %}{% endfor %}
+    </div>
+    <p class="legend">
+      {% for label, count, key in summary.rows %}
+      <span><i class="k-{{ key }}"></i>{{ label }} <b>{{ count }}</b></span>
+      {% endfor %}
+    </p>
+  </section>
+
+  <div class="findings">
+  {% for finding in findings %}
+  {% set status_key = finding.status|lower|replace('_', '-') %}
+  <details class="finding finding--{{ status_key }}">
+    <summary class="finding__head">
+      <span class="finding__index">{{ "%02d"|format(loop.index) }}</span>
+      <h2 class="finding__title">{{ finding.attack }}</h2>
+      <span class="pill pill--status">{{ finding.status|lower|replace('_', ' ')|title }}</span>
+      <span class="pill pill--sev sev--{{ finding.severity|lower }}">{{ finding.severity }}</span>
+      <span class="marker"><span class="marker-open">–</span><span class="marker-closed">+</span></span>
+    </summary>
+    <div class="finding__body">
+      <p class="finding__summary">{{ finding.summary | inline_code }}</p>
+
+      {% if finding.methodology %}
+      <div class="block">
+        <h3>
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="8.5" cy="8.5" r="5"/><path d="M12.5 12.5L17 17"/></svg>
+          What The Tool Did
+        </h3>
+        <ol class="steps">
+          {% for step in finding.methodology %}<li>{{ step | inline_code }}</li>{% endfor %}
+        </ol>
+      </div>
+      {% endif %}
+
+      {% if finding.reproduction %}
+      <div class="block">
+        <h3>
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 5 8 9 4 13"/><line x1="10" y1="13" x2="16" y2="13"/></svg>
+          How To Reproduce And Show Impact
+        </h3>
+        <ol class="steps">
+          {% for step in finding.reproduction %}<li>{{ step | inline_code }}</li>{% endfor %}
+        </ol>
+      </div>
+      {% endif %}
+
+      {% if finding.evidence %}
+      <div class="block">
+        <h3>
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 2.5h6l4 4v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V3.5a1 1 0 0 1 1-1z"/><path d="M11 2.5V6.5h4"/><line x1="7" y1="11" x2="13" y2="11"/><line x1="7" y1="14" x2="13" y2="14"/></svg>
+          Evidence
+        </h3>
+        <dl class="evidence">
+          {% for key, value in finding.evidence.items() %}
+          <div>
+            <dt>{{ key }}</dt>
+            <dd>
+              <span class="evidence__value">{{ value }}</span>
+              <button type="button" class="copy-btn" aria-label="Copy {{ key }}" title="Copy {{ key }}">
+                <svg class="copy-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="7" width="9" height="9" rx="1.5"/><path d="M4 13V4.5A1.5 1.5 0 0 1 5.5 3H13"/></svg>
+                <svg class="copy-check" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:none"><path d="M4 10.5l3.5 3.5L16 6"/></svg>
+              </button>
+            </dd>
+          </div>
+          {% endfor %}
+        </dl>
+      </div>
+      {% endif %}
+
+      {% if finding.manual_followup %}
+      <div class="block">
+        <h3>
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h7M4 10h7M4 14h4"/><path d="M13.5 13.8l1.6 1.6 3-3.2"/></svg>
+          Manual Follow-Up
+        </h3>
+        <ul class="notes">
+          {% for note in finding.manual_followup %}<li>{{ note | inline_code }}</li>{% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+
+      {% if finding.remediation %}
+      <div class="block">
+        <h3>
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2l6 2.2v5c0 4-3 6.6-6 8-3-1.4-6-4-6-8v-5L10 2z"/><path d="M7.3 10l1.9 1.9L13 8.3"/></svg>
+          Remediation
+        </h3>
+        <p>{{ finding.remediation | inline_code }}</p>
+      </div>
+      {% endif %}
+
+      {% if finding.references %}
+      <div class="block">
+        <h3>
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 11a3 3 0 0 0 4.5.4l2.5-2.5a3 3 0 0 0-4.2-4.2l-1 1"/><path d="M12 9a3 3 0 0 0-4.5-.4L5 11.1a3 3 0 0 0 4.2 4.2l1-1"/></svg>
+          References
+        </h3>
+        <ul class="references">
+          {% for ref in finding.references %}
+          <li><a href="{{ ref.url }}" target="_blank" rel="noopener noreferrer">{{ ref.label }}</a></li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+
+    </div>
+  </details>
+  {% endfor %}
+  </div>
+
+  <footer class="footer">
+    <p>Generated by jwtpen. For authorized security testing only. Use this report solely
+    against systems you own or are explicitly authorized in writing to test.</p>
+    <p>&copy; {{ scan_time.year }} jwtpen</p>
+  </footer>
+
+</main>
+
+<script>
+  // Export PDF: ask the backend to render this same report to PDF and download it. The backend
+  // (not the browser) does the rendering, so the file matches the report's print form exactly.
+  (function () {
+    const btn = document.getElementById("export-pdf");
+    if (!btn) return;
+    const original = btn.innerHTML;
+    btn.addEventListener("click", async () => {
+      btn.disabled = true;
+      btn.textContent = "Generating PDF…";
+      try {
+        const res = await fetch("/report.pdf");
+        if (!res.ok) throw new Error("PDF export failed (HTTP " + res.status + ").");
+        const url = URL.createObjectURL(await res.blob());
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "jwtpen-report.pdf";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        alert(err.message || "Could not generate the PDF.");
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = original;
+      }
+    });
+  })();
+
+  // One-click copy for every evidence value. Reads the exact text of the value beside the button
+  // (textContent, so a PEM's real newlines are preserved) and copies it; falls back to a hidden
+  // textarea + execCommand where the async clipboard API is unavailable (e.g. a non-secure origin).
+  (function () {
+    async function copyText(text) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch (clipboardUnavailable) {
+        // The async clipboard API is blocked (older browser or non-secure origin): fall back to
+        // the legacy hidden-textarea copy below rather than surfacing the error.
+        try {
+          const ta = document.createElement("textarea");
+          ta.value = text;
+          ta.style.position = "fixed";
+          ta.style.opacity = "0";
+          document.body.appendChild(ta);
+          ta.select();
+          const ok = document.execCommand("copy");
+          ta.remove();
+          return ok;
+        } catch (fallbackFailed) {
+          // Both copy paths failed; report failure to the caller so it skips the "copied" flash.
+          return false;
+        }
+      }
+    }
+    function flash(btn) {
+      const icon = btn.querySelector(".copy-icon");
+      const check = btn.querySelector(".copy-check");
+      btn.classList.add("copied");
+      if (icon) icon.style.display = "none";
+      if (check) check.style.display = "";
+      setTimeout(() => {
+        btn.classList.remove("copied");
+        if (icon) icon.style.display = "";
+        if (check) check.style.display = "none";
+      }, 1200);
+    }
+    for (const btn of document.querySelectorAll(".copy-btn")) {
+      btn.addEventListener("click", async () => {
+        const dd = btn.closest("dd");
+        const value = dd ? dd.querySelector(".evidence__value") : null;
+        if (value && (await copyText(value.textContent))) flash(btn);
+      });
+    }
+  })();
+</script>
+</body>
+</html>

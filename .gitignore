@@ -1,0 +1,19 @@
+# Python bytecode / caches
+__pycache__/
+*.pyc
+
+# Virtual environment (see README setup)
+.venv/
+
+# Pytest cache (tests/)
+.pytest_cache/
+
+# Generated scan reports: the HTML/PDF the tool writes
+reports/
+
+# Secrets: this tool handles real tokens/requests; never commit them
+.env
+
+# Editor + Windows OS files
+.vscode/
+Thumbs.db
