@@ -70,3 +70,6 @@ classes, forges the proof-of-concept tokens, and generates a reproducible HTML/P
   UI layers, catalogued in `tests/TEST-PLAN.md`.
 - The suite is offline by construction: an autouse guard fails any test that attempts a real
   outbound request, and API tests drive the ASGI app in-process without binding a port.
+
+[Unreleased]: https://github.com/omsahare-14/jwtpen/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/omsahare-14/jwtpen/releases/tag/v0.1.0
