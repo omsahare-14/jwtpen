@@ -20,3 +20,7 @@ pydantic>=2.9           # webapp/server.py: typed request models (ships with Fas
 
 # --- Tests (offline, no network) ---
 pytest>=8.0             # run the suite in tests/
+httpx2>=2.0             # tests/: FastAPI's TestClient is built on it, so the API tests drive
+                        #   the app in-process with no socket. Never imported by our own code,
+                        #   which is why a clean install failed while a dev machine that happened
+                        #   to have it did not. Current starlette requires httpx2, not httpx.

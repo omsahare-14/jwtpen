@@ -125,9 +125,16 @@ jobs:
         # GitHub's own secret scanning is free on public repos but not private ones, so this
         # covers the gap while the repository is private. A pentesting tool handles real
         # tokens; a committed one would be unrecoverable once pushed.
+        #
+        # 'gitleaks git' scans commit history rather than the working tree, which is the point:
+        # a secret deleted in a later commit is still retrievable from the earlier one. Reviewed
+        # false positives are listed by fingerprint in .gitleaksignore.
+        #
+        # --redact keeps any match out of the public log output, so a real finding does not leak
+        # a second time through the CI transcript.
         env:
-          GITLEAKS_VERSION: "8.21.2"
+          GITLEAKS_VERSION: "8.30.1"
         run: |
           curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
             | tar -xz -C /tmp gitleaks
-          /tmp/gitleaks detect --source . --redact --verbose
+          /tmp/gitleaks git --redact --verbose .
